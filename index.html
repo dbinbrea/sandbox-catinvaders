@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cat Invaders</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Courier New', monospace;
+            color: #0f0;
+        }
+
+        #gameCanvas {
+            border: 2px solid #0f0;
+            background: #001a00;
+            image-rendering: pixelated;
+        }
+
+        #gameInfo {
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        #score, #lives, #gameOver {
+            font-size: 24px;
+            margin: 10px;
+        }
+
+        #gameOver {
+            color: #ff0000;
+            font-size: 32px;
+            font-weight: bold;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        #instructions {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 14px;
+            color: #0a0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🐱 CAT INVADERS 🐱</h1>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <div id="gameInfo">
+        <div id="score">Score: 0</div>
+        <div id="lives">Lives: 3</div>
+        <div id="gameOver" class="hidden">GAME OVER! Press SPACE to restart</div>
+    </div>
+    <div id="instructions">
+        Use ← → ARROW KEYS to move | SPACE to shoot
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Game state
+        let gameState = {
+            player: null,
+            cats: [],
+            bullets: [],
+            catBullets: [],
+            score: 0,
+            lives: 3,
+            gameOver: false,
+            catDirection: 1,
+            catSpeed: 1,
+            catDropAmount: 30,
+            lastCatShot: 0,
+            keys: {}
+        };
+
+        // Player class
+        class Player {
+            constructor() {
+                this.width = 50;
+                this.height = 40;
+                this.x = canvas.width / 2 - this.width / 2;
+                this.y = canvas.height - this.height - 20;
+                this.speed = 5;
+            }
+
+            draw() {
+                // Draw a simple spaceship
+                ctx.fillStyle = '#00ff00';
+                ctx.beginPath();
+                ctx.moveTo(this.x + this.width / 2, this.y);
+                ctx.lineTo(this.x, this.y + this.height);
+                ctx.lineTo(this.x + this.width / 2, this.y + this.height - 10);
+                ctx.lineTo(this.x + this.width, this.y + this.height);
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            moveLeft() {
+                if (this.x > 0) {
+                    this.x -= this.speed;
+                }
+            }
+
+            moveRight() {
+                if (this.x < canvas.width - this.width) {
+                    this.x += this.speed;
+                }
+            }
+
+            shoot() {
+                gameState.bullets.push(new Bullet(this.x + this.width / 2 - 2, this.y, -5));
+            }
+        }
+
+        // Cat class
+        class Cat {
+            constructor(x, y) {
+                this.width = 40;
+                this.height = 30;
+                this.x = x;
+                this.y = y;
+                this.alive = true;
+            }
+
+            draw() {
+                if (!this.alive) return;
+
+                // Draw a cute cat face
+                ctx.fillStyle = '#ff69b4';
+
+                // Cat body
+                ctx.fillRect(this.x, this.y + 10, this.width, this.height - 10);
+
+                // Cat ears
+                ctx.beginPath();
+                ctx.moveTo(this.x + 5, this.y + 10);
+                ctx.lineTo(this.x, this.y);
+                ctx.lineTo(this.x + 10, this.y + 10);
+                ctx.fill();
+
+                ctx.beginPath();
+                ctx.moveTo(this.x + this.width - 5, this.y + 10);
+                ctx.lineTo(this.x + this.width, this.y);
+                ctx.lineTo(this.x + this.width - 10, this.y + 10);
+                ctx.fill();
+
+                // Cat eyes
+                ctx.fillStyle = '#000';
+                ctx.fillRect(this.x + 10, this.y + 15, 5, 5);
+                ctx.fillRect(this.x + 25, this.y + 15, 5, 5);
+
+                // Cat whiskers
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(this.x, this.y + 20);
+                ctx.lineTo(this.x - 5, this.y + 20);
+                ctx.moveTo(this.x + this.width, this.y + 20);
+                ctx.lineTo(this.x + this.width + 5, this.y + 20);
+                ctx.stroke();
+            }
+
+            move(direction, amount) {
+                this.x += direction * amount;
+            }
+
+            drop() {
+                this.y += gameState.catDropAmount;
+            }
+
+            shoot() {
+                gameState.catBullets.push(new Bullet(this.x + this.width / 2 - 2, this.y + this.height, 3));
+            }
+        }
+
+        // Bullet class
+        class Bullet {
+            constructor(x, y, speed) {
+                this.width = 4;
+                this.height = 10;
+                this.x = x;
+                this.y = y;
+                this.speed = speed;
+                this.active = true;
+            }
+
+            draw() {
+                ctx.fillStyle = this.speed < 0 ? '#00ff00' : '#ff0000';
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+            }
+
+            update() {
+                this.y += this.speed;
+
+                if (this.y < 0 || this.y > canvas.height) {
+                    this.active = false;
+                }
+            }
+        }
+
+        // Initialize game
+        function initGame() {
+            gameState = {
+                player: new Player(),
+                cats: [],
+                bullets: [],
+                catBullets: [],
+                score: 0,
+                lives: 3,
+                gameOver: false,
+                catDirection: 1,
+                catSpeed: 1,
+                catDropAmount: 30,
+                lastCatShot: 0,
+                keys: {}
+            };
+
+            // Create cat formation
+            const rows = 4;
+            const cols = 8;
+            const spacing = 80;
+            const offsetX = 100;
+            const offsetY = 60;
+
+            for (let row = 0; row < rows; row++) {
+                for (let col = 0; col < cols; col++) {
+                    gameState.cats.push(new Cat(
+                        offsetX + col * spacing,
+                        offsetY + row * spacing
+                    ));
+                }
+            }
+
+            document.getElementById('gameOver').classList.add('hidden');
+            updateUI();
+        }
+
+        // Update UI
+        function updateUI() {
+            document.getElementById('score').textContent = `Score: ${gameState.score}`;
+            document.getElementById('lives').textContent = `Lives: ${gameState.lives}`;
+        }
+
+        // Check collision between two rectangles
+        function checkCollision(rect1, rect2) {
+            return rect1.x < rect2.x + rect2.width &&
+                   rect1.x + rect1.width > rect2.x &&
+                   rect1.y < rect2.y + rect2.height &&
+                   rect1.y + rect1.height > rect2.y;
+        }
+
+        // Update game state
+        function update() {
+            if (gameState.gameOver) return;
+
+            // Move player
+            if (gameState.keys['ArrowLeft']) {
+                gameState.player.moveLeft();
+            }
+            if (gameState.keys['ArrowRight']) {
+                gameState.player.moveRight();
+            }
+
+            // Update bullets
+            gameState.bullets.forEach(bullet => bullet.update());
+            gameState.bullets = gameState.bullets.filter(b => b.active);
+
+            gameState.catBullets.forEach(bullet => bullet.update());
+            gameState.catBullets = gameState.catBullets.filter(b => b.active);
+
+            // Move cats
+            let changeDirection = false;
+            const aliveCats = gameState.cats.filter(cat => cat.alive);
+
+            aliveCats.forEach(cat => {
+                if ((cat.x <= 0 && gameState.catDirection === -1) ||
+                    (cat.x >= canvas.width - cat.width && gameState.catDirection === 1)) {
+                    changeDirection = true;
+                }
+            });
+
+            if (changeDirection) {
+                gameState.catDirection *= -1;
+                gameState.cats.forEach(cat => {
+                    if (cat.alive) cat.drop();
+                });
+                gameState.catSpeed += 0.2;
+            }
+
+            gameState.cats.forEach(cat => {
+                if (cat.alive) {
+                    cat.move(gameState.catDirection, gameState.catSpeed);
+                }
+            });
+
+            // Check bullet-cat collisions
+            gameState.bullets.forEach(bullet => {
+                gameState.cats.forEach(cat => {
+                    if (cat.alive && bullet.active && checkCollision(bullet, cat)) {
+                        cat.alive = false;
+                        bullet.active = false;
+                        gameState.score += 10;
+                        updateUI();
+                    }
+                });
+            });
+
+            // Check cat bullet-player collisions
+            gameState.catBullets.forEach(bullet => {
+                if (bullet.active && checkCollision(bullet, gameState.player)) {
+                    bullet.active = false;
+                    gameState.lives--;
+                    updateUI();
+
+                    if (gameState.lives <= 0) {
+                        gameState.gameOver = true;
+                        document.getElementById('gameOver').classList.remove('hidden');
+                    }
+                }
+            });
+
+            // Random cat shooting
+            if (Date.now() - gameState.lastCatShot > 1000) {
+                const shootingCats = aliveCats.filter(cat => Math.random() < 0.1);
+                shootingCats.forEach(cat => cat.shoot());
+                gameState.lastCatShot = Date.now();
+            }
+
+            // Check if cats reached the bottom
+            aliveCats.forEach(cat => {
+                if (cat.y + cat.height >= gameState.player.y) {
+                    gameState.gameOver = true;
+                    document.getElementById('gameOver').classList.remove('hidden');
+                }
+            });
+
+            // Check if all cats are destroyed
+            if (aliveCats.length === 0) {
+                // Victory! Restart with more cats
+                setTimeout(initGame, 2000);
+            }
+        }
+
+        // Draw everything
+        function draw() {
+            // Clear canvas
+            ctx.fillStyle = '#001a00';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw game objects
+            gameState.player.draw();
+            gameState.cats.forEach(cat => cat.draw());
+            gameState.bullets.forEach(bullet => bullet.draw());
+            gameState.catBullets.forEach(bullet => bullet.draw());
+        }
+
+        // Game loop
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            gameState.keys[e.key] = true;
+
+            if (e.key === ' ') {
+                e.preventDefault();
+                if (gameState.gameOver) {
+                    initGame();
+                } else {
+                    gameState.player.shoot();
+                }
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            gameState.keys[e.key] = false;
+        });
+
+        // Start the game
+        initGame();
+        gameLoop();
+    </script>
+</body>
+</html>
