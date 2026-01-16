@@ -72,6 +72,124 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
+        // Audio context for sound effects
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+        // Cat meow sound effects
+        const SoundEffects = {
+            // Player shoots - quick "pew" meow
+            playerShoot: function() {
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+
+                oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(400, audioContext.currentTime + 0.1);
+
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.1);
+            },
+
+            // Cat gets hit - surprised meow
+            catHit: function() {
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+
+                oscillator.frequency.setValueAtTime(600, audioContext.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(200, audioContext.currentTime + 0.2);
+
+                gainNode.gain.setValueAtTime(0.4, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.2);
+            },
+
+            // Cat shoots - aggressive meow
+            catShoot: function() {
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+
+                oscillator.frequency.setValueAtTime(400, audioContext.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(300, audioContext.currentTime + 0.15);
+
+                gainNode.gain.setValueAtTime(0.25, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15);
+
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.15);
+            },
+
+            // Player gets hit - painful meow
+            playerHit: function() {
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+
+                oscillator.frequency.setValueAtTime(700, audioContext.currentTime);
+                oscillator.frequency.linearRampToValueAtTime(400, audioContext.currentTime + 0.1);
+                oscillator.frequency.linearRampToValueAtTime(300, audioContext.currentTime + 0.3);
+
+                gainNode.gain.setValueAtTime(0.4, audioContext.currentTime);
+                gainNode.gain.linearRampToValueAtTime(0.2, audioContext.currentTime + 0.1);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.3);
+            },
+
+            // Game over - sad long meow
+            gameOver: function() {
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+
+                oscillator.frequency.setValueAtTime(500, audioContext.currentTime);
+                oscillator.frequency.linearRampToValueAtTime(400, audioContext.currentTime + 0.3);
+                oscillator.frequency.linearRampToValueAtTime(250, audioContext.currentTime + 0.8);
+
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gainNode.gain.linearRampToValueAtTime(0.35, audioContext.currentTime + 0.2);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.8);
+
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.8);
+            },
+
+            // Cat movement - soft periodic meow
+            catMove: function() {
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+
+                oscillator.frequency.setValueAtTime(350, audioContext.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(320, audioContext.currentTime + 0.08);
+
+                gainNode.gain.setValueAtTime(0.15, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.08);
+
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.08);
+            }
+        };
+
         // Game state
         let gameState = {
             player: null,
@@ -124,6 +242,7 @@
 
             shoot() {
                 gameState.bullets.push(new Bullet(this.x + this.width / 2 - 2, this.y, -5));
+                SoundEffects.playerShoot();
             }
         }
 
@@ -185,6 +304,7 @@
 
             shoot() {
                 gameState.catBullets.push(new Bullet(this.x + this.width / 2 - 2, this.y + this.height, 3));
+                SoundEffects.catShoot();
             }
         }
 
@@ -300,6 +420,7 @@
                     if (cat.alive) cat.drop();
                 });
                 gameState.catSpeed += 0.2;
+                SoundEffects.catMove();
             }
 
             gameState.cats.forEach(cat => {
@@ -315,6 +436,7 @@
                         cat.alive = false;
                         bullet.active = false;
                         gameState.score += 10;
+                        SoundEffects.catHit();
                         updateUI();
                     }
                 });
@@ -325,10 +447,12 @@
                 if (bullet.active && checkCollision(bullet, gameState.player)) {
                     bullet.active = false;
                     gameState.lives--;
+                    SoundEffects.playerHit();
                     updateUI();
 
                     if (gameState.lives <= 0) {
                         gameState.gameOver = true;
+                        SoundEffects.gameOver();
                         document.getElementById('gameOver').classList.remove('hidden');
                     }
                 }
@@ -345,6 +469,7 @@
             aliveCats.forEach(cat => {
                 if (cat.y + cat.height >= gameState.player.y) {
                     gameState.gameOver = true;
+                    SoundEffects.gameOver();
                     document.getElementById('gameOver').classList.remove('hidden');
                 }
             });
